@@ -10,7 +10,7 @@
   "scripts": {
     "test": "node --test test/scanner.test.js test/injector.test.js test/app-service.test.js test/hub-e2e.test.js",
     "app": "electron app/main.js",
-    "dist": "electron-builder --mac",
+    "dist": "electron-builder --mac --publish never",
     "dist:dir": "electron-builder --dir",
     "test:app": "xvfb-run -a node test/app/e2e.js"
   },
