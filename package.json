@@ -1,6 +1,6 @@
 {
   "name": "spamguard-studio",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "SpamGuard Studio: scan micro-sites, find enquiry forms and protect them from spam. Mac app.",
   "private": true,
   "license": "UNLICENSED",

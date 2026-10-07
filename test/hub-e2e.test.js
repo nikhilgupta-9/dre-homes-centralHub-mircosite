@@ -85,8 +85,9 @@ let SITE_DIR, OUT, res;
 test('Studio protects a site AND registers it at the hub; config carries the keys', { skip: SKIP, timeout: 60000 }, async () => {
   SITE_DIR = path.join(tmp, 'sites', 'acmedental.in');
   fs.mkdirSync(SITE_DIR, { recursive: true });
-  fs.writeFileSync(path.join(SITE_DIR, 'index.html'), '<html><head><title>Acme</title></head><body><form action="contact.php" method="post"><input name="name"><input type="email" name="email"><input name="phone"><textarea name="message"></textarea><button>Send</button></form></body></html>');
+  fs.writeFileSync(path.join(SITE_DIR, 'index.html'), '<html><head><title>Acme</title></head><body><p>Call <span id="ph">98765 43210</span> or <a id="tl" href="tel:+919876543210">tap to call</a></p><form action="contact.php" method="post"><input name="name"><input type="email" name="email"><input name="phone"><textarea name="message"></textarea><button>Send</button></form></body></html>');
   fs.writeFileSync(path.join(SITE_DIR, 'contact.php'), "<?php\nfile_put_contents(__DIR__ . '/received.log', $_POST['name'] . \"\\n\", FILE_APPEND);\nheader('Location: thank-you.html');\n");
+  fs.writeFileSync(path.join(SITE_DIR, 'about.php'), '<?php $x = 1; ?>\n<!doctype html>\n<html><head><title>About us</title><meta name="description" content="old description"></head><body><h1>About</h1><p>Call 98765 43210 or write to old@acme.in. We are at 5 Old Street, Jaipur.</p><a href="tel:+919876543210">Phone</a></body></html>\n');
   fs.writeFileSync(path.join(SITE_DIR, 'thank-you.html'), '<html><body>thanks</body></html>');
   OUT = path.join(tmp, 'out');
 
@@ -133,7 +134,7 @@ test('LIVE: protected site runs under PHP; spam is blocked; the real enquiry rea
   const tok = JSON.parse(await (await fetch(S + '/spamguard/token.php')).text()).t;
   assert.ok(tok.length > 20);
   await sleep(500);
-  assert.match(site(), /^1\.3\.0\|8\./, 'first heartbeat arrived: kit version + php version');
+  assert.match(site(), /^1\.4\.0\|8\./, 'first heartbeat arrived: kit version + php version');
   assert.equal(sql('SELECT last_seen_at IS NOT NULL FROM sites ORDER BY id LIMIT 1'), '1');
 
   // a real person
@@ -176,4 +177,89 @@ test('LIVE: protected site runs under PHP; spam is blocked; the real enquiry rea
   assert.match(sites.text, /acmedental\.in/);
   assert.match(sites.text, />Live</);
   assert.match(sites.text, />ON</);
+});
+
+test('LIVE: site-wide hooks were added; contact details and SEO edits made at the hub reach the real pages', { skip: SKIP, timeout: 120000 }, async () => {
+  const dir = res.outputs.folder;
+  const S = siteProc.base;
+  // what Studio put into the site
+  const about = fs.readFileSync(path.join(dir, 'about.php'), 'utf8');
+  assert.match(about, /^<\?php \/\* SpamGuard:apply \*\/.*\$x = 1; \?>/, 'about.php already started with PHP: the line goes right after <?php');
+  assert.match(about, /SpamGuard:apply \*\/ if \(is_file\(__DIR__ \. '\/spamguard\/sg-apply\.php'\)\)/);
+  assert.match(fs.readFileSync(path.join(dir, 'index.html'), 'utf8'), /<!-- SpamGuard:contact --><script src="\/spamguard\/contact\.js" defer><\/script>\s*<\/body>/);
+  assert.ok(res.siteWide.enabled && res.siteWide.phpPages >= 1 && res.siteWide.jsPages >= 2, JSON.stringify(res.siteWide));
+  assert.match(renderProtectText(res), /HUB se jude hooks/);
+  assert.ok(!fs.readFileSync(path.join(dir, 'spamguard', 'sg-apply.php'), 'utf8').includes('<?php\n// '), 'kit has the apply file');
+  assert.equal(fs.readFileSync(path.join(dir, 'thank-you.html'), 'utf8').includes('contact.js'), true, 'every HTML page gets the contact script');
+  const sp = fs.readFileSync(path.join(dir, 'spamguard', 'sg-apply.php'), 'utf8');
+  assert.match(sp, /SgApply::start\(\)/);
+
+  // nothing at the hub yet: the page is served exactly as before
+  const before = await (await fetch(S + '/about.php')).text();
+  assert.match(before, /<title>About us<\/title>/);
+  assert.match(before, /Call 98765 43210/);
+
+  // the owner edits contact details + one page's SEO at the hub
+  const sid = sql('SELECT id FROM sites LIMIT 1');
+  const form = async (p, data, from = p) => {
+    const pg = await hubReq('GET', from);
+    const csrf = /name="_csrf" value="([a-f0-9]+)"/.exec(pg.text)[1];
+    return hubReq('POST', p, Object.assign({ _csrf: csrf }, data));
+  };
+  let r = await form('/contact-edit.php', { id: sid, f_phone: '+91 99999 11111', f_whatsapp: '+919999911111', f_email: 'hello@acmedental.in', f_address: '12 New Road, Jaipur', old_phone: '98765 43210', old_email: 'old@acme.in', old_address: '5 Old Street, Jaipur', custom: 'rera=P5210' }, `/contact-edit.php?id=${sid}`);
+  assert.equal(r.status, 303);
+  await form('/seo-site.php', { id: sid, do: 'addpage', path: '/about.php' }, `/seo-site.php?id=${sid}`);
+  const h = require('crypto').createHash('md5').update('/about.php').digest('hex');
+  r = await form('/seo-page.php', { id: sid, h, do: 'ovr', title: 'About Acme Dental | Jaipur', description: 'Family dentist in Jaipur. Book your visit today.', og_image: 'https://acmedental.in/og.jpg', canonical: '', robots: 'index,follow', schema_json: '{"@context":"https://schema.org","@type":"Dentist","name":"Acme Dental","telephone":"98765 43210"}' }, `/seo-page.php?id=${sid}&h=${h}`);
+  assert.equal(r.status, 303);
+
+  // the site picks it up on its own (no cron): the contact endpoint is the page-view clock
+  const dataDir = fs.readdirSync(path.join(dir, 'spamguard')).find((n) => n.startsWith('sg-data-'));
+  fs.rmSync(path.join(dir, 'spamguard', dataDir, 'hub.sync'), { force: true });
+  await fetch(S + '/spamguard/contact.php');
+  await sleep(800);
+  const c = await (await fetch(S + '/spamguard/contact.php')).json();
+  assert.equal(c.v, 1);
+  assert.equal(c.f.phone, '+91 99999 11111');
+  assert.equal(c.custom.rera, 'P5210');
+  assert.deepEqual(c.legacy.phone, ['98765 43210']);
+  assert.ok(fs.existsSync(path.join(dir, 'spamguard', dataDir, 'seo.json')));
+  assert.match(fs.readFileSync(path.join(dir, 'spamguard', '.htaccess'), 'utf8'), /sg-apply/, 'apply file is not downloadable');
+
+  // the real page, rewritten on its way out (SEO + contact), valid HTML kept
+  const after = await (await fetch(S + '/about.php')).text();
+  assert.match(after, /<title>About Acme Dental \| Jaipur<\/title>/);
+  assert.equal((after.match(/<title>/g) || []).length, 1);
+  assert.match(after, /<meta name="description" content="Family dentist in Jaipur\. Book your visit today\.">/);
+  assert.ok(!after.includes('old description'));
+  assert.match(after, /property="og:image" content="https:\/\/acmedental\.in\/og\.jpg"/);
+  assert.match(after, /"@type":"Dentist"/);
+  assert.match(after, /Call \+91 99999 11111 or write to hello@acmedental\.in\. We are at 12 New Road, Jaipur\./);
+  assert.match(after, /href="tel:\+919999911111"/);
+  assert.ok(!after.includes('98765 43210') || /"telephone":"\+91 99999 11111"/.test(after), 'the phone inside the schema is swapped too');
+  // other pages and the form handler are untouched
+  assert.equal(await (await fetch(S + '/thank-you.html')).text().then((t) => t.includes('thanks')), true);
+  const post = await fetch(S + '/contact.php', { method: 'POST', redirect: 'manual', headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'curl/8' }, body: new URLSearchParams({ name: 'X', sg_website: 'bot' }) });
+  assert.equal(post.status, 303, 'forms still work through the guard');
+
+  // the hub shows "laga hua" for both
+  await sleep(300);
+  assert.match((await hubReq('GET', `/contact-edit.php?id=${sid}`)).text, /Site par laga hai \(v1\)/);
+  assert.equal(sql(`SELECT ovr_synced_version FROM seo_sites WHERE site_id=${sid}`), '1');
+
+  // a browser: contact.js swaps old numbers in the static page and on tel: links
+  let chromium;
+  try { chromium = require('playwright').chromium; } catch (e) { return; }
+  const b = await chromium.launch({ executablePath: fs.existsSync('/opt/pw-browsers/chromium') ? undefined : undefined, args: ['--no-sandbox'] }).catch(() => null);
+  if (!b) return;
+  try {
+    const pg = await b.newPage();
+    const errs = [];
+    pg.on('pageerror', (e) => errs.push(String(e)));
+    await pg.goto(S + '/index.html');
+    await pg.waitForFunction(() => document.getElementById('ph').textContent.includes('99999'), null, { timeout: 8000 });
+    assert.equal(await pg.textContent('#ph'), '+91 99999 11111');
+    assert.equal(await pg.getAttribute('#tl', 'href'), 'tel:+919999911111');
+    assert.deepEqual(errs, []);
+  } finally { await b.close(); }
 });

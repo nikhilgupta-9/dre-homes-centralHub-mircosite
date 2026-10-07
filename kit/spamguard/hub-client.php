@@ -70,7 +70,9 @@ final class SgHub
             }
             $hb = self::marker('hub.beat');
             $beatDue = $force || !$hb || !is_file($hb) || (time() - (int) @filemtime($hb)) > 6 * 3600;
-            if (!$beatDue && !$events) {
+            $sy = self::marker('hub.sync');
+            $syncDue = $force || !$sy || !is_file($sy) || (time() - (int) @filemtime($sy)) > 600;
+            if (!$beatDue && !$events && !$syncDue) {
                 return;
             }
             $lock = self::marker('hub.lock');
@@ -86,6 +88,13 @@ final class SgHub
                 $ok = self::heartbeat($s) && $ok;
                 if ($ok && $hb) {
                     @touch($hb);
+                }
+            }
+            if ($syncDue) {
+                $okSync = self::sync($s);
+                $ok = $okSync && $ok;
+                if ($okSync && $sy) {
+                    @touch($sy);
                 }
             }
             if ($back) {
@@ -174,6 +183,60 @@ final class SgHub
             'daily' => $daily,
         ];
         return self::post($s, $data) !== null;
+    }
+
+    /** Version of a synced file we already apply (0 = none). */
+    public static function haveVersion(string $name): int
+    {
+        $d = SpamGuard::dataPath();
+        $j = $d !== null && is_file($d . '/' . $name) ? json_decode((string) @file_get_contents($d . '/' . $name), true) : null;
+        return is_array($j) ? max(0, (int) ($j['v'] ?? 0)) : 0;
+    }
+
+    /** Read a synced file (contact.json / seo.json). Null when there is none. */
+    public static function readSynced(string $name): ?array
+    {
+        $d = SpamGuard::dataPath();
+        $j = $d !== null && is_file($d . '/' . $name) ? json_decode((string) @file_get_contents($d . '/' . $name), true) : null;
+        return is_array($j) ? $j : null;
+    }
+
+    private static function writeSynced(string $name, array $data): bool
+    {
+        $d = SpamGuard::dataPath();
+        if ($d === null) {
+            return false;
+        }
+        $tmp = $d . '/' . $name . '.tmp' . getmypid();
+        if (@file_put_contents($tmp, json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), LOCK_EX) === false) {
+            return false;
+        }
+        return @rename($tmp, $d . '/' . $name);
+    }
+
+    /**
+     * Ask the hub whether the central contact details / SEO edits changed, store them locally and confirm.
+     * The confirmation happens in the same call chain, so the hub can show "laga hua" within seconds.
+     */
+    private static function sync(array $s): bool
+    {
+        for ($round = 0; $round < 2; $round++) {
+            $res = self::post($s, ['v' => 1, 'type' => 'sync', 'have' => ['contact' => self::haveVersion('contact.json'), 'seo' => self::haveVersion('seo.json')]]);
+            if ($res === null) {
+                return false;
+            }
+            $changed = false;
+            if (isset($res['contact']) && is_array($res['contact']) && isset($res['contact']['v'])) {
+                $changed = self::writeSynced('contact.json', $res['contact']) || $changed;
+            }
+            if (isset($res['seo']) && is_array($res['seo']) && isset($res['seo']['v'])) {
+                $changed = self::writeSynced('seo.json', $res['seo']) || $changed;
+            }
+            if (!$changed) {
+                break; // nothing new: done (the confirmation for an earlier change went out in round 2)
+            }
+        }
+        return true;
     }
 
     /** @return array|null decoded JSON answer, or null when the hub could not be reached / refused */

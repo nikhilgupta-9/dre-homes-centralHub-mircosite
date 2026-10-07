@@ -68,7 +68,12 @@ function renderProtectText(r) {
 
   if (r.changes.length) {
     L.push('KYA BADLA (sirf jodi gayi lines, kuch delete ya rewrite nahi hua):');
-    for (const c of r.changes) L.push(`  + ${c.file}  (line ~${c.line})  [${c.kind === 'guard-call' ? 'guard' : 'script'}]`, `      ${c.text}`);
+    for (const c of r.changes.filter((x) => x.kind === 'guard-call' || x.kind === 'script-tag')) L.push(`  + ${c.file}  (line ~${c.line})  [${c.kind === 'guard-call' ? 'guard' : 'script'}]`, `      ${c.text}`);
+    if (r.siteWide && r.siteWide.enabled) {
+      L.push(`  + HUB se jude hooks: ${r.siteWide.phpPages} PHP page(s) mein 1 line (central SEO + contact badlav), ${r.siteWide.jsPages} page(s) mein contact.js ka <script> tag.`);
+      for (const k of r.siteWide.skipped.slice(0, 8)) L.push(`      chhoda: ${k.file} (${k.why})`);
+      if (r.siteWide.skipped.length > 8) L.push(`      ... aur ${r.siteWide.skipped.length - 8} files`);
+    }
     if (r.kit.installed) L.push('  + spamguard/  (kit ka folder + config.php, naya)');
     L.push('');
   }

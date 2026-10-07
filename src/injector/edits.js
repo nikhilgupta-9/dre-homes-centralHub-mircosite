@@ -8,6 +8,9 @@
 const GUARD_BEGIN = '/* SpamGuard:begin */';
 const GUARD_END = '/* SpamGuard:end */';
 const SCRIPT_MARK = '<!-- SpamGuard -->';
+const APPLY_BEGIN = '/* SpamGuard:apply */';
+const APPLY_END = '/* SpamGuard:apply-end */';
+const CONTACT_MARK = '<!-- SpamGuard:contact -->';
 
 const detectEol = (t) => (t.includes('\r\n') ? '\r\n' : '\n');
 
@@ -119,6 +122,43 @@ function planScriptEdit(text, afterLine, tagSrc) {
   return { error: 'script-position-unsafe' };
 }
 
+
+/**
+ * Site-wide hook for PHP pages: one require_once at the very top, so the page's HTML can be rewritten on its way out
+ * (central SEO edits + new contact details). Fail-open: if the kit folder is missing, nothing happens.
+ * Returns {offset, insert} or {error}.
+ */
+function planApplyEdit(text, relToRoot) {
+  if (/sg-apply\.php/i.test(text)) return { error: 'already' };
+  const eol = detectEol(text);
+  const p = (relToRoot ? relToRoot.replace(/\/+$/, '') + '/' : '') + 'spamguard/sg-apply.php';
+  const file = `__DIR__ . '/${p}'`;
+  const body = `${APPLY_BEGIN} if (is_file(${file})) { require_once ${file}; } ${APPLY_END}`;
+  const bom = text.startsWith('\xEF\xBB\xBF') ? 3 : 0;
+  if (/^<\?php(?=[\s]|$)/i.test(text.slice(bom))) {
+    const spot = findGuardSpot(text);
+    if (spot.error) return spot;
+    const restOfLine = /^[^\r\n]*/.exec(text.slice(spot.offset))[0];
+    return { offset: spot.offset, insert: restOfLine.trim() === '' ? eol + body : ' ' + body };
+  }
+  if (/^\s*<\?(?!php\b|=)/i.test(text.slice(bom))) return { error: 'short-open-tag' };
+  // the file starts with HTML (or has PHP only further down): put a tiny PHP block in front of it.
+  if (/declare\s*\(\s*strict_types/i.test(text)) return { error: 'declare-after-html' };
+  if (/^namespace\b/im.test(text) && /<\?php[\s\S]*?\bnamespace\s+[\w\\]+\s*[;{]/i.test(text)) return { error: 'namespace-after-html' };
+  return { offset: bom, insert: `<?php ${body} ?>` + eol };
+}
+
+/** <script src=".../contact.js"> before the last </body> (outside PHP). */
+function planContactScriptEdit(text, src) {
+  if (/contact\.js/i.test(text) && /spamguard\/contact\.js/i.test(text)) return { error: 'already' };
+  const eol = detectEol(text);
+  const body = text.toLowerCase().lastIndexOf('</body>');
+  if (body === -1) return { error: 'no-body' };
+  if (inPhpAt(text, body)) return { error: 'script-position-unsafe' };
+  const needsEol = body > 0 && text[body - 1] !== '\n';
+  return { offset: body, insert: (needsEol ? eol : '') + `${CONTACT_MARK}<script src="${src}" defer></script>` + eol };
+}
+
 /** Apply insertions (never overlapping) from the end of the file to the start. */
 function applyInsertions(text, edits) {
   const sorted = edits.slice().sort((a, b) => b.offset - a.offset);
@@ -144,4 +184,4 @@ function applyInsertions(text, edits) {
 /** 1-based line number of an offset. */
 const lineOfOffset = (text, offset) => text.slice(0, offset).split('\n').length;
 
-module.exports = { planGuardEdit, planScriptEdit, applyInsertions, phpInline, guardCode, lineOfOffset, detectEol, GUARD_BEGIN, GUARD_END, SCRIPT_MARK };
+module.exports = { planApplyEdit, planContactScriptEdit, planGuardEdit, planScriptEdit, applyInsertions, phpInline, guardCode, lineOfOffset, detectEol, GUARD_BEGIN, GUARD_END, SCRIPT_MARK };

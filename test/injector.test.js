@@ -340,3 +340,32 @@ test('report text reads well and stays honest', async () => {
   assert.match(t, /MANUAL BAAKI/);
   assert.ok(!/AB AAPKO KYA KARNA HAI/.test(t), 'no upload instructions when nothing changed');
 });
+
+test('site-wide hooks: one require line at the top of PHP pages, insertion-only, fail-open, idempotent', () => {
+  const E = require('../src/injector/edits');
+  const ap = (t, rel = '') => E.planApplyEdit(t, rel);
+  const run = (t, rel) => { const p = ap(t, rel); assert.ok(!p.error, JSON.stringify(p)); return E.applyInsertions(t, [p]); };
+  // starts with PHP
+  let out = run('<?php\n$a = 1;\n?><html><head></head></html>');
+  assert.match(out, /^<\?php\n\/\* SpamGuard:apply \*\/ if \(is_file\(__DIR__ \. '\/spamguard\/sg-apply\.php'\)\) \{ require_once __DIR__ \. '\/spamguard\/sg-apply\.php'; \} \/\* SpamGuard:apply-end \*\/\n\$a = 1;/);
+  // declare + namespace stay first; BOM kept; CRLF kept
+  out = run('\xEF\xBB\xBF<?php\r\ndeclare(strict_types=1);\r\nnamespace App;\r\necho 1;\r\n');
+  assert.ok(out.startsWith('\xEF\xBB\xBF<?php\r\ndeclare(strict_types=1);\r\nnamespace App;\r\n/* SpamGuard:apply */'));
+  // starts with HTML: a tiny PHP block in front, and the output of the page is byte-identical (PHP eats the one newline)
+  out = run('<!doctype html>\n<html><head></head><body><?= $x ?></body></html>');
+  assert.match(out, /^<\?php \/\* SpamGuard:apply \*\/.*\?>\n<!doctype html>\n/);
+  // sub-folder pages climb to the site root
+  assert.match(run('<html><head></head></html>', '../..'), /__DIR__ \. '\/..\/..\/spamguard\/sg-apply\.php'/);
+  // idempotent
+  assert.equal(ap(out).error, 'already');
+  // refuse what we cannot do safely
+  assert.equal(ap('<?php namespace A { echo 1; }').error, 'bracketed-namespace');
+  assert.equal(ap('<? echo 1; ?><html></html>').error, 'short-open-tag');
+  assert.equal(ap('<html></html><?php declare(strict_types=1);').error, 'declare-after-html');
+  // contact.js goes before the last </body>, never inside PHP
+  let j = E.planContactScriptEdit('<html><body>x</body></html>', '/spamguard/contact.js');
+  assert.match(E.applyInsertions('<html><body>x</body></html>', [j]), /x\n<!-- SpamGuard:contact --><script src="\/spamguard\/contact\.js" defer><\/script>\n<\/body>/);
+  assert.equal(E.planContactScriptEdit('<?php echo "</body>"; ?>', '/x.js').error, 'script-position-unsafe');
+  assert.equal(E.planContactScriptEdit('<html></html>', '/x.js').error, 'no-body');
+  assert.equal(E.planContactScriptEdit('<script src="/spamguard/contact.js"></script></body>', '/x.js').error, 'already');
+});

@@ -26,7 +26,7 @@ if (is_file(__DIR__ . '/hub-client.php')) {
 
 final class SpamGuard
 {
-    const VERSION = '1.3.0';
+    const VERSION = '1.4.0';
     const F_HONEYPOT = 'sg_website';
     const F_TOKEN = 'sg_t';
     const F_INTERACT = 'sg_i';

@@ -207,7 +207,8 @@ async function protectSite(input, opts = {}) {
     // ---- install the kit (only if at least one form got protected)
     const anyApplied = result.changes.length > 0 || alreadyDone.length > 0;
     const kitTarget = path.join(siteDir, 'spamguard');
-    if (result.changes.length > 0) {
+    const hubWanted = !!(opts.hub && opts.hub.url && opts.hub.token) && opts.siteWide !== false && scan.site.platform !== 'wordpress';
+    if (result.changes.length > 0 || hubWanted) {
       if (fs.existsSync(kitTarget)) {
         result.kit.alreadyPresent = true;
       } else {
@@ -240,6 +241,55 @@ async function protectSite(input, opts = {}) {
         });
         fs.writeFileSync(path.join(kitTarget, 'config.php'), gen.php);
         result.login = { adminPath: '/spamguard/spam-admin.php', selftestPath: `/spamguard/selftest.php?key=${gen.selftestKey}`, password: gen.password, passwordWasGenerated: gen.generatedPassword };
+      }
+    }
+
+    // ---- site-wide hooks (only for sites that are connected to the hub): central SEO + contact details
+    result.siteWide = { enabled: false, phpPages: 0, jsPages: 0, skipped: [] };
+    const hubOk = result.hub && (result.hub.status === 'connected' || result.hub.status === 'dry-run');
+    const cfgFile = path.join(kitTarget, 'config.php');
+    const existingHub = !result.hub && fs.existsSync(cfgFile) && /'hub'\s*=>/.test(fs.readFileSync(cfgFile, 'latin1'));
+    if ((hubOk || existingHub) && opts.siteWide !== false && scan.site.platform !== 'wordpress' && fs.existsSync(kitTarget)) {
+      result.siteWide.enabled = true;
+      const SKIP_DIR = /(^|\/)(spamguard|vendor|node_modules|\.git|admin|administrator|wp-admin|wp-includes|phpmyadmin)\//i;
+      const jsSrc = (opts.basePath ? opts.basePath.replace(/\/*$/, '/') : '/') + 'spamguard/contact.js';
+      const swTree = listTree(siteDir);
+      const snapshot = new Map();
+      const swEdits = new Map();
+      for (const f of swTree.files) {
+        if (SKIP_DIR.test(f.rel + '') || !/\.(php|phtml|html?)$/i.test(f.rel) || f.size > 1500000) continue;
+        const isPhp = /\.(php|phtml)$/i.test(f.rel);
+        const cur = readLatin(path.join(siteDir, f.rel));
+        const edits = [];
+        const hasPage = /<html[\s>]|<head[\s>]|<\/body>/i.test(cur);
+        if (!hasPage) continue;
+        if (isPhp && /<html[\s>]|<head[\s>]/i.test(cur)) {
+          const a = E.planApplyEdit(cur, relToRoot(f.rel));
+          if (a.error && a.error !== 'already') result.siteWide.skipped.push({ file: f.rel, why: a.error });
+          else if (!a.error) edits.push(Object.assign({ kind: 'sg-apply', file: f.rel }, a));
+        }
+        const j = E.planContactScriptEdit(cur, jsSrc);
+        if (j.error && !['already', 'no-body'].includes(j.error)) result.siteWide.skipped.push({ file: f.rel, why: j.error });
+        else if (!j.error) edits.push(Object.assign({ kind: 'contact-js', file: f.rel }, j));
+        if (edits.length) { snapshot.set(f.rel, cur); swEdits.set(f.rel, edits); }
+      }
+      const swFailed = new Set();
+      for (const [rel, edits] of swEdits) {
+        writeLatin(path.join(siteDir, rel), E.applyInsertions(snapshot.get(rel), edits));
+        if (hasPhp() && /\.(php|phtml)$/i.test(rel)) {
+          const r = spawnSync('php', ['-l', path.join(siteDir, rel)], { timeout: 20000, encoding: 'utf8' });
+          if (r.status !== 0) {
+            writeLatin(path.join(siteDir, rel), snapshot.get(rel)); // back to how it was before this step
+            swFailed.add(rel);
+            result.siteWide.skipped.push({ file: rel, why: 'php-syntax-check-failed' });
+            continue;
+          }
+        }
+        for (const e of edits) {
+          const lead = e.insert.startsWith('\r\n') ? 2 : e.insert.startsWith('\n') ? 1 : 0;
+          result.changes.push({ file: rel, kind: e.kind, line: E.lineOfOffset(snapshot.get(rel), e.offset) + (lead ? 1 : 0), text: e.insert.trim() });
+          if (e.kind === 'sg-apply') result.siteWide.phpPages++; else result.siteWide.jsPages++;
+        }
       }
     }
 

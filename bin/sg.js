@@ -22,6 +22,7 @@ const HELP = `SpamGuard Studio (Phase 2 scanner + Phase 3 protect)
   sg protect <site.zip | site-folder> --out <folder> [--dry-run] [--include-review] [--sql dump.sql]
             [--password p] [--notify mail] [--quarantine] [--timezone Asia/Kolkata] [--keep-folder] [--base-path /sub/]
             [--hub-url https://hub.example.com --hub-token TOKEN]   (site khud hub mein judd jati hai)
+            [--no-site-wide]   (hub se jude contact/SEO hooks pages mein mat lagao)
       Site ko protect karo. Output folder mein: <site>-protected.zip, <site>-backup-original.zip,
       report.txt, report.json, PRIVATE-login.txt. Original zip/folder ko haath nahi lagta.
       --dry-run: kuch likhe bina bas dikhao ki kya badlega.
@@ -96,6 +97,7 @@ async function main() {
       quarantine: !!args.quarantine,
       keepFolder: !!args['keep-folder'],
       basePath: str('base-path'),
+      siteWide: !args['no-site-wide'],
       hub: str('hub-url') && str('hub-token') ? { url: str('hub-url'), token: str('hub-token') } : undefined,
     };
     if (args.bulk) {

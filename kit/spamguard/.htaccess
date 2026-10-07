@@ -1,5 +1,5 @@
 # Private files: never served to the browser.
-<FilesMatch "^(config|integrity|make-config)\.php$">
+<FilesMatch "^(config|integrity|make-config|sg-apply)\.php$">
   <IfModule mod_authz_core.c>
     Require all denied
   </IfModule>
