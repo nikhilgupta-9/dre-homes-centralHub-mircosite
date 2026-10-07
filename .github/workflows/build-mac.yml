@@ -13,7 +13,17 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
       - run: npm ci
-      - run: npm run dist
+      - name: Build dmg
+        shell: bash
+        run: |
+          set +e
+          npm run dist > build.log 2>&1
+          rc=$?
+          if [ $rc -ne 0 ]; then
+            MSG=$(grep -v '^\s*$' build.log | tail -25 | head -c 3500 | sed ':a;N;$!ba;s/%/%25/g;s/\r//g;s/\n/%0A/g')
+            echo "::error title=dist failed::$MSG"
+          fi
+          exit $rc
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'   # unsigned build (Apple Developer ID ho to hata do aur secrets lagao)
       - uses: actions/upload-artifact@v4
