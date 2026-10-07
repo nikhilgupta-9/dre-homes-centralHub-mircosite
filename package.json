@@ -12,7 +12,9 @@
     "app": "electron app/main.js",
     "dist": "electron-builder --mac --publish never",
     "dist:dir": "electron-builder --dir",
-    "test:app": "xvfb-run -a node test/app/e2e.js"
+    "test:app": "xvfb-run -a node test/app/e2e.js",
+    "web": "node bin/sg-web.js",
+    "test:web": "node test/web.e2e.js"
   },
   "engines": {
     "node": ">=18"

@@ -66,10 +66,6 @@
     $('settings').hidden = !open;
     $('btn-settings').setAttribute('aria-expanded', String(open));
   });
-  $('s-pick').addEventListener('click', async () => {
-    const d = await sg.chooseOutDir();
-    if (d) $('s-out').value = d;
-  });
   $('s-save').addEventListener('click', async () => {
     try {
       settings = await sg.setSettings({ outDir: $('s-out').value, notifyEmail: $('s-mail').value, quarantine: $('s-quar').checked, includeReview: $('s-review').checked, timezone: settings.timezone, hubUrl: $('s-hub').value, hubToken: $('s-tok').value });
@@ -89,8 +85,13 @@
   // ------------------------------------------------------------------ input: drop / pick
   async function handlePaths(paths) {
     banner('');
-    if (!paths || !paths.length) return;
     try {
+      if (paths && typeof paths.then === 'function') {
+        busy('Files load ho rahi hain...', 'Sirf aapke computer par, kahin bheji nahi ja rahi');
+        paths = await paths;
+        if (!paths.length) return show('home');
+      }
+      if (!paths || !paths.length) return;
       const c = await sg.classify(paths);
       if (c.kind === 'invalid') return banner(c.reason);
       drop = c;
@@ -110,13 +111,13 @@
   const dz = $('drop');
   ['dragenter', 'dragover'].forEach((ev) => dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.add('over'); }));
   ['dragleave', 'drop'].forEach((ev) => dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.remove('over'); }));
-  dz.addEventListener('drop', (e) => handlePaths(sg.pathsFromDrop(e.dataTransfer.files)));
+  dz.addEventListener('drop', (e) => handlePaths(sg.pathsFromDrop(e.dataTransfer)));
   // a file dropped anywhere else must not open in the window
   document.addEventListener('dragover', (e) => e.preventDefault());
-  document.addEventListener('drop', (e) => { e.preventDefault(); if (!dz.contains(e.target)) handlePaths(sg.pathsFromDrop(e.dataTransfer.files)); });
+  document.addEventListener('drop', (e) => { e.preventDefault(); if (!dz.contains(e.target)) handlePaths(sg.pathsFromDrop(e.dataTransfer)); });
   dz.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('pick-zip').click(); } });
-  $('pick-zip').addEventListener('click', async () => handlePaths(await sg.pick('zip')));
-  $('pick-folder').addEventListener('click', async () => handlePaths(await sg.pick('folder')));
+  $('pick-zip').addEventListener('click', async () => handlePaths(sg.pick('zip')));
+  $('pick-folder').addEventListener('click', async () => handlePaths(sg.pick('folder')));
 
   // ------------------------------------------------------------------ single site: scan result
   const STATUS = { auto: ['Apne aap', 'ok'], review: ['Review', 'warn'], manual: ['Haath se', 'bad'], skip: ['Enquiry nahi', ''], done: ['Pehle se', 'ok'] };

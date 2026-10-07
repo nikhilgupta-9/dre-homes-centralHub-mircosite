@@ -2,7 +2,7 @@
 <html lang="hi">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self' data:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; connect-src 'self'; img-src 'self' data:">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SpamGuard Studio</title>
 <link rel="stylesheet" href="style.css">
@@ -19,7 +19,7 @@
   <section id="settings" class="card" hidden>
     <h2>Settings</h2>
     <div class="row"><label for="s-out">Result kahan save ho</label>
-      <div class="inline"><input id="s-out" type="text" readonly><button id="s-pick" class="ghost" type="button">Badlo</button></div></div>
+      <div class="inline"><input id="s-out" type="text" spellcheck="false"></div></div>
     <div class="row"><label for="s-mail">Spam report ka email (optional)</label><input id="s-mail" type="email" placeholder="admin@example.com"></div>
     <div class="row check"><input id="s-quar" type="checkbox"><label for="s-quar">Shak wale (suspicious) enquiry ko alag rakho, owner ko na bhejo</label></div>
     <p class="hint">Band rakho to shak wali enquiry owner tak jaayegi, bas admin page mein "Suspicious" dikhegi. Pakki spam hamesha rukti hai.</p>
@@ -112,6 +112,7 @@
 
 <dialog id="report-dialog"><div class="dlg-head"><b>Report</b><button id="report-close" class="ghost" type="button">Band karo</button></div><pre id="report-text"></pre></dialog>
 
+<script src="bridge.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
