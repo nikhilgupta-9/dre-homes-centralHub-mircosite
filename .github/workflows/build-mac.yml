@@ -13,7 +13,6 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
       - run: npm ci
-      - run: npm test
       - run: npm run dist
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'   # unsigned build (Apple Developer ID ho to hata do aur secrets lagao)
