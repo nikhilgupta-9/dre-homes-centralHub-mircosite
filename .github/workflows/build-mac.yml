@@ -1,0 +1,23 @@
+# Mac app (.dmg) banane ke liye. Aapko Mac ki zarurat nahi: GitHub apna Mac khud deta hai.
+# Use: GitHub par repo banao -> Actions tab -> "Build Mac app" -> Run workflow -> kuch minute baad "SpamGuard-Studio-mac" artifact download karo.
+name: Build Mac app
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+jobs:
+  mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npm test
+      - run: npm run dist
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'   # unsigned build (Apple Developer ID ho to hata do aur secrets lagao)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SpamGuard-Studio-mac
+          path: dist/*.dmg

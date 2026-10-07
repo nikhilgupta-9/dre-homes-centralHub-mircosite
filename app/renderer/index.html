@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self' data:">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SpamGuard Studio</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand"><span class="logo" aria-hidden="true"></span><b>SpamGuard</b> <span class="muted">Studio</span></div>
+  <button id="btn-settings" class="ghost" type="button" aria-expanded="false">Settings</button>
+</header>
+
+<main>
+  <div id="banner" class="banner" role="alert" hidden></div>
+
+  <section id="settings" class="card" hidden>
+    <h2>Settings</h2>
+    <div class="row"><label for="s-out">Result kahan save ho</label>
+      <div class="inline"><input id="s-out" type="text" readonly><button id="s-pick" class="ghost" type="button">Badlo</button></div></div>
+    <div class="row"><label for="s-mail">Spam report ka email (optional)</label><input id="s-mail" type="email" placeholder="admin@example.com"></div>
+    <div class="row check"><input id="s-quar" type="checkbox"><label for="s-quar">Shak wale (suspicious) enquiry ko alag rakho, owner ko na bhejo</label></div>
+    <p class="hint">Band rakho to shak wali enquiry owner tak jaayegi, bas admin page mein "Suspicious" dikhegi. Pakki spam hamesha rukti hai.</p>
+    <div class="row check"><input id="s-review" type="checkbox"><label for="s-review">"Review" wale forms bhi protect karo</label></div>
+    <h2 class="mt">Central Hub (optional)</h2>
+    <p class="hint">Bhar do to har nayi protect hui site apne aap hub mein judd jayegi (leads, status sab wahan dikhega).</p>
+    <div class="row"><label for="s-hub">Hub ka address</label><input id="s-hub" type="text" placeholder="https://hub.aapkidomain.com" autocomplete="off" spellcheck="false"></div>
+    <div class="row"><label for="s-tok">Hub token</label><input id="s-tok" type="password" autocomplete="off" placeholder="" spellcheck="false"></div>
+    <div class="actions"><button id="s-save" class="primary" type="button">Save</button></div>
+  </section>
+
+  <!-- HOME -->
+  <section id="view-home" class="view">
+    <div id="drop" class="drop" tabindex="0" role="button" aria-label="Site ka zip ya folder yahan chhodo">
+      <div class="drop-art" aria-hidden="true"></div>
+      <h1>Site ka zip ya folder yahan chhodo</h1>
+      <p>Ek site ya bahut saari sites ek saath. Database (.sql) ho to wo bhi saath mein.</p>
+      <div class="actions">
+        <button id="pick-zip" class="primary" type="button">Zip chuno</button>
+        <button id="pick-folder" class="ghost" type="button">Folder chuno</button>
+      </div>
+    </div>
+    <p class="hint center">Aapki original files ko kuch nahi hota. Hamesha backup banta hai.</p>
+  </section>
+
+  <!-- BUSY -->
+  <section id="view-busy" class="view" hidden>
+    <div class="card busy">
+      <div class="spinner" aria-hidden="true"></div>
+      <h2 id="busy-title">Kaam ho raha hai...</h2>
+      <p id="busy-sub" class="muted"></p>
+      <div id="busy-bar" class="bar" hidden><i></i></div>
+      <p id="busy-detail" class="hint"></p>
+    </div>
+  </section>
+
+  <!-- SCAN RESULT (one site) -->
+  <section id="view-scan" class="view" hidden>
+    <div class="head">
+      <div><h1 id="scan-name"></h1><p id="scan-meta" class="muted"></p></div>
+      <button id="scan-back" class="ghost" type="button">Dusri site</button>
+    </div>
+    <div id="scan-tiles" class="tiles"></div>
+    <div id="scan-forms" class="list"></div>
+    <div class="actions sticky">
+      <button id="scan-sql" class="ghost" type="button">Database (.sql) jodo</button>
+      <span id="scan-sqlname" class="muted"></span>
+      <span class="spacer"></span>
+      <button id="scan-go" class="primary" type="button">Protect karo</button>
+    </div>
+  </section>
+
+  <!-- DONE (one site) -->
+  <section id="view-done" class="view" hidden>
+    <div id="done-banner" class="status"></div>
+    <div id="done-hub" class="hint"></div>
+    <div id="done-tiles" class="tiles"></div>
+    <div id="done-forms" class="list"></div>
+    <div id="done-login" class="card" hidden>
+      <h2>Admin login</h2>
+      <p class="muted">Ye password sirf yahin dikhta hai. Copy karke safe jagah rakh lo (PRIVATE-login.txt mein bhi hai).</p>
+      <div class="inline"><code id="done-pass"></code><button id="done-copy" class="ghost" type="button">Copy</button></div>
+    </div>
+    <div id="done-steps" class="card" hidden><h2>Ab kya karna hai</h2><ol></ol></div>
+    <div class="actions sticky">
+      <button id="done-folder" class="primary" type="button">Result folder kholo</button>
+      <button id="done-report" class="ghost" type="button">Report padho</button>
+      <span class="spacer"></span>
+      <button id="done-again" class="ghost" type="button">Dusri site</button>
+    </div>
+  </section>
+
+  <!-- BULK SCAN -->
+  <section id="view-bulkscan" class="view" hidden>
+    <div class="head"><div><h1 id="bs-title"></h1><p class="muted">Sab sites scan ho gayi. Abhi kuch badla nahi hai.</p></div><button id="bs-back" class="ghost" type="button">Wapas</button></div>
+    <div id="bs-tiles" class="tiles"></div>
+    <div id="bs-table" class="table-wrap"></div>
+    <div class="actions sticky"><span class="spacer"></span><button id="bs-go" class="primary" type="button">Sab protect karo</button></div>
+  </section>
+
+  <!-- BULK DONE -->
+  <section id="view-bulkdone" class="view" hidden>
+    <div id="bd-banner" class="status"></div>
+    <div id="bd-tiles" class="tiles"></div>
+    <div id="bd-table" class="table-wrap"></div>
+    <div class="card"><p class="muted">Har site ke folder mein protected zip, backup aur report hai. Saare admin password <b>PRIVATE-credentials.csv</b> mein hain. Is file ko kisi ko mat bhejo.</p></div>
+    <div class="actions sticky"><button id="bd-folder" class="primary" type="button">Result folder kholo</button><span class="spacer"></span><button id="bd-again" class="ghost" type="button">Dusri sites</button></div>
+  </section>
+</main>
+
+<dialog id="report-dialog"><div class="dlg-head"><b>Report</b><button id="report-close" class="ghost" type="button">Band karo</button></div><pre id="report-text"></pre></dialog>
+
+<script src="app.js"></script>
+</body>
+</html>
