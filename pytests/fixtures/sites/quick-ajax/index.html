@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Quick Movers</title>
+<meta name="description" content="Quick Movers - local business">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+<h1>Quick Movers</h1>
+<form id="contactForm" method="post">
+  <input name="name"><input type="email" name="email"><textarea name="message"></textarea><button>Send</button>
+</form>
+<script src="js/jquery.min.js"></script>
+<script>
+$('#contactForm').on('submit', function (e) {
+  e.preventDefault();
+  $.ajax({
+    type: 'POST',
+    url: 'send.php',
+    data: $(this).serialize(),
+    dataType: 'json',
+    success: function (res) {
+      if (res.status == 'success') { alert(res.message); } else { alert('Error'); }
+    }
+  });
+});
+</script>
+</body>
+</html>

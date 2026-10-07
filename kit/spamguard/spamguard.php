@@ -168,6 +168,33 @@ final class SpamGuard
         return function_exists('mb_strtolower') ? mb_strtolower($s, 'UTF-8') : strtolower($s);
     }
 
+    /**
+     * Admin password check. Two stored formats are accepted:
+     *   pbkdf2$<iterations>$<salt-hex>$<hash-hex>   (PBKDF2-HMAC-SHA256, made by the Python tool)
+     *   anything password_hash() understands          (bcrypt, made by make-config.php / the older Node tool)
+     */
+    public static function verifyPassword(string $password, string $stored): bool
+    {
+        if ($stored === '') {
+            return false;
+        }
+        if (strncmp($stored, 'pbkdf2$', 7) === 0) {
+            $p = explode('$', $stored);
+            if (count($p) !== 4 || !ctype_digit($p[1]) || !ctype_xdigit($p[2]) || !ctype_xdigit($p[3]) || strlen($p[2]) % 2 !== 0) {
+                return false;
+            }
+            $iter = (int) $p[1];
+            if ($iter < 1000 || $iter > 5000000) {
+                return false;
+            }
+            $salt = hex2bin($p[2]);
+            $want = strtolower($p[3]);
+            $got = hash_pbkdf2('sha256', $password, $salt, $iter, strlen($want), false);
+            return hash_equals($want, $got);
+        }
+        return password_verify($password, $stored);
+    }
+
     public static function clientIp(?array $server = null): string
     {
         $server = $server ?? $_SERVER;

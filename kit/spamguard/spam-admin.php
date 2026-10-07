@@ -84,7 +84,7 @@ if (empty($_SESSION['ok'])) {
         $st->execute([$ip]);
         if ((int) $st->fetchColumn() >= 5) {
             $err = 'Too many wrong attempts. Try again in 15 minutes.';
-        } elseif (password_verify((string) $_POST['password'], (string) $cfg['admin_password_hash'])) {
+        } elseif (SpamGuard::verifyPassword((string) $_POST['password'], (string) $cfg['admin_password_hash'])) {
             session_regenerate_id(true);
             $_SESSION['ok'] = 1;
             $_SESSION['csrf'] = bin2hex(random_bytes(16));

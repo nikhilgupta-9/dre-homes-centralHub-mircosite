@@ -1,21 +1,10 @@
 {
   "name": "spamguard-studio",
   "version": "0.4.0",
-  "description": "SpamGuard Studio: scan micro-sites, find enquiry forms and protect them from spam. Mac app.",
+  "description": "Node REFERENCE implementation, used only by the Python parity tests (pytests/). Users run studio.py.",
   "private": true,
   "license": "UNLICENSED",
-  "bin": {
-    "sg": "bin/sg.js"
-  },
-  "scripts": {
-    "test": "node --test test/scanner.test.js test/injector.test.js test/app-service.test.js test/hub-e2e.test.js",
-    "app": "electron app/main.js",
-    "dist": "electron-builder --mac --publish never",
-    "dist:dir": "electron-builder --dir",
-    "test:app": "xvfb-run -a node test/app/e2e.js",
-    "web": "node bin/sg-web.js",
-    "test:web": "node test/web.e2e.js"
-  },
+  "scripts": {},
   "engines": {
     "node": ">=18"
   },
@@ -24,48 +13,5 @@
     "bcryptjs": "^2.4.3",
     "cheerio": "^1.0.0"
   },
-  "devDependencies": {
-    "electron": "^44.6.0",
-    "electron-builder": "^26.15.3"
-  },
-  "main": "app/main.js",
-  "productName": "SpamGuard Studio",
-  "author": "Your Company <you@example.com>",
-  "build": {
-    "appId": "com.yourcompany.spamguardstudio",
-    "productName": "SpamGuard Studio",
-    "asar": false,
-    "files": [
-      "app/**/*",
-      "src/**/*",
-      "kit/**/*",
-      "package.json",
-      "node_modules/**/*",
-      "!node_modules/.cache",
-      "!**/*.md",
-      "!test/**"
-    ],
-    "mac": {
-      "category": "public.app-category.developer-tools",
-      "target": [
-        {
-          "target": "dmg",
-          "arch": [
-            "arm64",
-            "x64"
-          ]
-        }
-      ],
-      "identity": null,
-      "hardenedRuntime": false
-    },
-    "dmg": {
-      "title": "SpamGuard Studio"
-    },
-    "directories": {
-      "output": "dist",
-      "buildResources": "build"
-    },
-    "npmRebuild": false
-  }
+  "devDependencies": {}
 }

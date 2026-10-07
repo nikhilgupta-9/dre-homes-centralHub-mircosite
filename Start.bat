@@ -1,6 +1,5 @@
 @echo off
 cd /d "%~dp0"
-where node >nul 2>nul || (echo Node.js install karo: https://nodejs.org & pause & exit /b 1)
-if not exist node_modules call npm install --omit=dev --ignore-scripts --no-audit --no-fund
-node bin\sg-web.js
+where python >nul 2>nul || (echo Python 3 install karo: python.org/downloads & pause & exit /b 1)
+python studio.py
 pause
